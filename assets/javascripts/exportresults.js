@@ -10,6 +10,10 @@ var ExportResults = function() {
     var surveyId;
     var resultList;
     var fileType;
+    var searchedFor;
+    var searchBy;
+
+
 
     function exportAllResults(currentSurveyId, fileType) {
         isAllResults = true;
@@ -17,7 +21,15 @@ var ExportResults = function() {
         drawDialog(fileType);
     }
 
-    function exportResults(currentSurveyId, selectedResults, fileType) {
+     function exportAllSearchResults(currentSurveyId, fileType, searchedFor, searchBy) {
+        isAllResults = true;
+        surveyId = currentSurveyId;
+        searchedFor = searchedFor;
+        searchBy = searchBy;
+        drawDialog(fileType,searchedFor,searchBy);
+    }
+
+    function exportResults(currentSurveyId, selectedResults, fileType, searchedFor, searchBy) {
         surveyId = currentSurveyId
         resultList = selectedResults;
         isAllResults = false;
@@ -57,7 +69,9 @@ var ExportResults = function() {
         exportDialog.dialog("close");
     }
 
-    function drawDialog(fileType) {
+
+    function drawDialog(fileType,searchedFor,searchBy) {
+        
         exportDialog.dialog({title: LOC.get('LOC_EXPORT_RESULTS'),
                               open: function(){
                               $('.ui-widget-overlay').hide().fadeIn();},
@@ -69,10 +83,10 @@ var ExportResults = function() {
         $('#exportResults-step_3').empty();
 
         if (fileType == "xls"){
-                    exportXLSResults();
+                    exportXLSResults(searchedFor,searchBy);
                               }
         else if (fileType == "csv"){
-                    exportCSVResults();  
+                    exportCSVResults(searchedFor,searchBy);  
                                   }
         else{
                                 alert("file type not supported");
@@ -80,20 +94,21 @@ var ExportResults = function() {
                    
                             }
 
-    function exportCSVResults() {
-        $.getJSON( 'service/surveyHasImages',
+    function exportCSVResults(searchedFor,searchBy) {
+        var getJSONQueryCSV =$.getJSON( 'service/surveyHasImages',
                    { 'surveyId': surveyId },
-                   function(result) { proceedExportResults( ".CSV", result.hasImages ); } );
+                   function(result) { proceedExportResults( ".CSV", result.hasImages,searchedFor,searchBy); } );
+        getJSONQueryCSV.error(Utils.redirectIfUnauthorized);
     }
 
-    function exportXLSResults() {
+    function exportXLSResults(searchedFor,searchBy) {
         var getJSONQuery = $.getJSON( 'service/surveyHasImages',
                    { 'surveyId': surveyId },
-                   function(result) { proceedExportResults( ".XLS", result.hasImages ); } );
+                   function(result) { proceedExportResults( ".XLS", result.hasImages, searchedFor,searchBy); } );
         getJSONQuery.error(Utils.redirectIfUnauthorized);
     }
 
-    function proceedExportResults(fileFormat, hasImages) {
+    function proceedExportResults(fileFormat, hasImages, searchedFor, searchBy) {
         $('#exportResults-step_1').empty();
         if ( hasImages ) {
             $('#exportResults-step_2').append( '<div class="exportImagesQuery">'
@@ -108,24 +123,28 @@ var ExportResults = function() {
 
             $('#buttonYES').text( LOC.get('LOC_YES') );
             $('#buttonNO').text( LOC.get('LOC_NO') );
-            $('#buttonYES').click( function(i) { includeImages( fileFormat,i ) } );
-            $('#buttonNO').click( function(i) { includeImages( fileFormat, i ) } );
+            $('#buttonYES').click( function(i) { includeImages( fileFormat,i, searchedFor, searchBy ) } );
+            $('#buttonNO').click( function(i) { includeImages( fileFormat, i, searchedFor, searchBy ) } );
         } else {
-            getFile( fileFormat, false );
+            getFile( fileFormat, false, searchedFor, searchBy );
         }
     }
 
-    function includeImages(fileFormat,i) {
-        getFile( fileFormat, (i.currentTarget.id == "buttonYES") );
+    function includeImages(fileFormat,i, searchedFor, searchBy) {
+        getFile( fileFormat, (i.currentTarget.id == "buttonYES"), searchedFor, searchBy );
     }
 
-    function getFile( fileFormat ,isWithImages ) {
+    function getFile( fileFormat ,isWithImages, searchedFor,searchBy ) {
         $('#exportResults-step_2').empty();
         $('#exportResults-step_3').append( '<img src="images/POPUP_ICON_LOADING.gif" />');
         $('#exportResults-step_3').append( '<b>Exporting survey results to' + fileFormat + ' file...</>' );
 
-        if( isAllResults ) {
-            window.location.href = "service/prepare?surveyId=" + surveyId + "&fileFormat=" + fileFormat + "&exportWithImages=" + isWithImages;//'exportWithImages': false//TODO handle additional question
+        if( isAllResults && searchedFor ) {
+            window.location.href = "service/prepare?surveyId=" + surveyId + "&fileFormat=" + fileFormat + "&searchField=" + searchBy + "&searchText=" + searchedFor + "&exportWithImages=" + isWithImages;//'exportWithImages': false//TODO handle additional question
+        }else if( isAllResults ) {
+            window.location.href = "service/prepare?surveyId=" + surveyId + "&fileFormat=" + fileFormat + "&exportWithImages=" + isWithImages;
+        }else if( !isAllResults && searchedFor ) {
+            window.location.href = "service/prepareselected?ids=" + resultList.join(',') + "&fileFormat=" + fileFormat + "&exportWithImages=" + isWithImages;    
         } else {
             window.location.href = "service/prepareselected?ids=" + resultList.join(',') + "&fileFormat=" + fileFormat + "&exportWithImages=" + isWithImages;//'exportWithImages': false//TODO handle additional question
         }
@@ -133,7 +152,8 @@ var ExportResults = function() {
     }
 
     return { exportAllResults : function(surveyId, fileType) {exportAllResults(surveyId, fileType);},
-             exportResults : function( surveyId, selectedResults, fileType) {exportResults(surveyId,selectedResults,fileType);},
+             exportAllSearchResults : function(surveyId, fileType, searchedFor, searchBy) {exportAllSearchResults(surveyId, fileType, searchedFor, searchBy);},
+             exportResults : function( surveyId, selectedResults, fileType, searchedFor, searchBy ) {exportResults(surveyId,selectedResults,fileType, searchedFor, searchBy);},
              exportToKML : function(surveyId, selectedResults) {exportToKML(surveyId,selectedResults);},
              exportAllToKML : function(surveyId) {exportAllToKML(surveyId);}
     };

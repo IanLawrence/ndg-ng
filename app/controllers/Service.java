@@ -19,12 +19,16 @@
 
 package controllers;
 
+import javax.persistence.Query;
+import play.db.jpa.JPA;
+
 import play.mvc.Http.StatusCode;
 
 import controllers.logic.AuthorizationUtils;
 import controllers.transformer.CSVTransformer;
 import controllers.transformer.ExcelTransformer;
 import controllers.util.FileUtilities;
+import controllers.ListData;
 
 import models.Answer;
 import models.Category;
@@ -496,21 +500,98 @@ public class Service extends NdgController {
         send(fileName, fileContent);
     }
 
-    public static void prepare(String surveyId, String fileFormat, Boolean exportWithImages) {
+    private static String getQuery(String filterName, String filterValue, boolean isFilterString, String searchField,
+                                   String searchText, String orderBy, boolean isAscending ) {
+        StringBuilder query = new StringBuilder();
+
+        String statusQuery = "";
+        String searchQuery = "";
+        String sortingQuery = "";
+
+        if ( filterName != null && filterName.length() > 0
+          && filterValue != null && filterValue.length() > 0 ) {
+            statusQuery = filterName + "=" + ( isFilterString ? ("'" + filterValue + "'") : filterValue );
+        }
+
+        if ( searchField != null && searchText != null && searchText.length() > 0 ) {
+            if(searchField.equals("dateSent")) {
+                searchQuery = "DATE_FORMAT(" + searchField + ", '%d/%m/%Y')" + " like '%" + searchText + "%'";
+            }
+            else {
+                searchQuery = searchField + " like '%" + searchText + "%'";
+            }
+        }
+
+        if ( orderBy != null && orderBy.length()> 0 ) {
+            sortingQuery = "order by " + orderBy + ( isAscending ? " asc" : " desc" );
+        }
+
+        query.append( statusQuery )
+                .append( ( statusQuery.length() > 0 && searchQuery.length() > 0 ) ? " and " : ' ' )
+                   .append( searchQuery )
+                      .append( ' ' )
+                         .append( sortingQuery );
+
+        return query.toString();
+    }
+
+    public static void prepare(String surveyId, String fileFormat, String searchField, String searchText, Boolean exportWithImages) {
         String fileType = "";
         byte[] fileContent = null;
 
-        Survey survey = null;
+         if(searchField != null && searchField.length() > 0) {
 
-        try {
-            survey = Survey.findById(Long.decode(surveyId));
+            Survey survey = Survey.findById(Long.decode(surveyId));
+            String query = getQuery( "survey_id", String.valueOf( surveyId ), false, searchField, searchText, null, false );
+        
+            Collection<NdgResult> allResults = new ArrayList<NdgResult>();
+            List<NdgResult> results = NdgResult.find( query ).fetch();
 
-            if (!survey.ndgUser.userAdmin.equals(AuthorizationUtils.getSessionUserAdmin(session.get("ndgUser")))) {
-                error(StatusCode.UNAUTHORIZED, "Unauthorized");
+             for (int i = 0; i < results.size(); i++) {
+                    allResults.add(results.get(i));                          
             }
-        } catch (NullPointerException npe) {
-            error(StatusCode.UNAUTHORIZED, "Unauthorized");
-        }
+ 
+            if (exportWithImages == true) {
+            new File(survey.surveyId).mkdir();
+            new File(survey.surveyId + File.separator + "photos").mkdir();
+            }
+
+            if (FileUtilities.CSV.equalsIgnoreCase(fileFormat)) {
+                CSVTransformer transformer = new CSVTransformer(survey, allResults, exportWithImages);
+                fileContent = transformer.getBytes();
+                fileType = FileUtilities.CSV;
+            } else if (FileUtilities.XLS.equalsIgnoreCase(fileFormat)) {
+                ExcelTransformer transformer = new ExcelTransformer(survey, allResults, exportWithImages);
+                fileContent = transformer.getBytes();
+                fileType = FileUtilities.XLS;
+            }
+
+            if (exportWithImages == true) {
+                FileUtilities.zipSurvey(survey.surveyId, fileContent, fileType, FileUtilities.SURVEY + survey.surveyId + FileUtilities.ZIP);
+                File zipFile = new File(FileUtilities.SURVEY + survey.surveyId + FileUtilities.ZIP);
+                File zipDir = new File(survey.surveyId);
+                try {
+                    fileContent = FileUtilities.getBytesFromFile(zipFile);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+
+                fileType = FileUtilities.ZIP;
+                zipFile.delete();
+                FileUtilities.deleteDir(zipDir);
+            }
+
+            String fileName = FileUtilities.SURVEY + survey.surveyId + fileType;
+            send( fileName, fileContent );             
+            
+
+         }
+
+         // end of search
+
+        Survey survey = Survey.findById(Long.decode(surveyId));
+                                                              
+
 
         if (exportWithImages == true) {
             new File(survey.surveyId).mkdir();
@@ -518,13 +599,15 @@ public class Service extends NdgController {
         }
 
         if (FileUtilities.CSV.equalsIgnoreCase(fileFormat)) {
-            CSVTransformer transformer = new CSVTransformer(survey, exportWithImages);
+            CSVTransformer transformer = new CSVTransformer( survey, exportWithImages );
             fileContent = transformer.getBytes();//this is export all functionality
             fileType = FileUtilities.CSV;
         } else if (FileUtilities.XLS.equalsIgnoreCase(fileFormat)) {
             ExcelTransformer transformer = new ExcelTransformer(survey, exportWithImages);
             fileContent = transformer.getBytes();//this is export all functionality
             fileType = FileUtilities.XLS;
+
+    
         }
 
         if (exportWithImages == true) {

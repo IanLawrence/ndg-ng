@@ -7,6 +7,8 @@ var ResultList = function() {
 
     var currentSurveyId;
     var allResultSelected = false;
+    var selectedUser = false;
+    var resultTitle = false;
     var selectedResults = new Array();
     var searchLabels;
     var searchIds;
@@ -196,7 +198,7 @@ var ResultList = function() {
             var answer = data.preview[i+1];
             if (typeof answer == 'object') {
                       answer = '<img src="'+ $('#previewLayout').data('url') + '/' + answer.file.name +'" width="300" height="200">';
-		                           }	
+                               }  
             $('#previewLayout').append(rowBuilder( question, answer));  
                                                        }                                     
                                                                                                                                    
@@ -345,19 +347,26 @@ var ResultList = function() {
                getJSONQuery.error(Utils.redirectIfUnauthorized);
                              }
 
+
     function exportResults() {
-        var fileType = "xls"
-        if( allResultSelected ) {
-            ExportResults.exportAllResults( currentSurveyId, fileType );
-        } else if(selectedResults.length) {
-            ExportResults.exportResults( currentSurveyId, selectedResults, fileType );
+        var fileType = "xls";
+        if ( allResultSelected && resultTitle ) {
+            var searchedFor = $('#searchTextField').val();
+            ExportResults.exportAllSearchResults( currentSurveyId, fileType, searchedFor, searchBy )
+        }else if( allResultSelected && selectedUser) {
+            var searchedFor = $('#searchTextField').val();
+            ExportResults.exportAllSearchResults( currentSurveyId, fileType, searchedFor, searchBy );
+        } else if ( allResultSelected   ) { 
+            ExportResults.exportAllResults( currentSurveyId, fileType);
+        }else if(selectedResults.length) {
+            ExportResults.exportResults( currentSurveyId, selectedResults, fileType, searchedFor, searchBy );
         } else {
             alert("no results selected");
         }
     }
 
     function exportToCSV() {
-        var fileType = "csv"
+        var fileType = "csv";
         if( allResultSelected ) {
             ExportResults.exportAllResults( currentSurveyId, fileType );
         } else if(selectedResults.length) {
@@ -429,10 +438,19 @@ var ResultList = function() {
     }
 
     function searchFieldChange(event) {
+        selectedUser = false;
+        resultTitle = false;
         var fieldId = event.currentTarget.id;
         var nameIndex = jQuery.inArray( fieldId, searchIds );
         $('#searchComboText').text(searchLabels[nameIndex]);
         searchBy = searchDbFields[nameIndex];
+        if (searchBy == 'ndgUser.username'){
+            selectedUser = true;
+                                           }
+         if (searchBy == 'title'){
+            resultTitle  = true;
+                                           }
+                                           
         $('#searchTextField').val("");
     }
 }();
