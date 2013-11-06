@@ -47,6 +47,10 @@ public class NdgResult extends Model {
     @Required
     @Column( name = "ndg_result_id" )
     public String resultId;
+
+    @Required
+    @Column( name = "ndg_device_id" )
+    public String deviceId;
     
     @Required
     @Column( nullable = false, name = "start_time" )

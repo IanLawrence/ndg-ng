@@ -41,6 +41,7 @@ public class ResultParser {
 
     private static final String OPEN_ROSA_ROOT = "data";
     private static final String OPEN_ROSA_INSTANCE_ID = "instanceID";
+    private static final String OPEN_ROSA_DEVICE_ID = "deviceID";
     private static final String OPEN_ROSA_TIME_START = "timeStart";
     private static final String OPEN_ROSA_TIME_FINISH = "timeEnd";
     private static final String OPEN_ROSA_GEOSTAMP = "geostamp"; //Not OpenROSA
@@ -61,6 +62,13 @@ public class ResultParser {
 
             public void handleElement( ResultParser parser, Element element ) {
                 result.resultId = element.getText( 0 );
+            }
+        } );
+
+         elementHandlers.put( OPEN_ROSA_DEVICE_ID, new ResultElementHandler() {
+
+            public void handleElement( ResultParser parser, Element element ) {
+                result.deviceId = element.getText( 0 );
             }
         } );
 
